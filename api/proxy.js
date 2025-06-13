@@ -1,37 +1,38 @@
-// /api/proxy.js (Next.js API Route par exemple)
+// /api/proxy/[...slug].js  (nécessite renommage dans Next.js avec catch-all route)
 export default async function handler(req, res) {
-  // Préflight OPTIONS
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
 
-  const { url } = req.query;
-
-  if (!url) {
-    return res.status(400).json({
-      error: "Missing target URL",
-      usage: "Add ?url=studies&query.cond=diabetes&fmt=json to your request",
-      example: "/api/proxy?url=studies&query.cond=diabetes",
-    });
-  }
-
   try {
-    // Extraction de la chaîne de requête, sans "url"
+    // Récupération dynamique du chemin après /api/proxy/
+    const slug = req.query.slug;
+    const urlPath = Array.isArray(slug) ? slug.join("/") : slug || "";
+
+    if (!urlPath) {
+      return res.status(400).json({
+        error: "Missing target URL path",
+        usage: "Utilisez /api/proxy/studies?query.cond=diabetes",
+        example: "/api/proxy/studies?query.cond=diabetes",
+      });
+    }
+
+    // Récupération de la query string sans le slug
     const queryString = req.url.split("?")[1] || "";
     const cleanQueryString = queryString
       .replace(/(^|&)url=[^&]*/g, "")
       .replace(/^&|&$/g, "");
 
-    // Ajout de fmt=json si non précisé
+    // Ajout automatique de fmt=json si absent
     const hasFmt = /(?:^|&)fmt=/.test(cleanQueryString);
     const finalQuery = cleanQueryString
       ? cleanQueryString + (hasFmt ? "" : "&fmt=json")
       : "fmt=json";
 
-    // Construction de l'URL cible (API v2 uniquement)
-    const baseUrl = "https://clinicaltrials.gov/api/v2/";
-    const sanitizedUrl = url.replace(/^\/+/, ""); // évite les doubles slashs
-    const targetUrl = `${baseUrl}${sanitizedUrl}${finalQuery ? "?" + finalQuery : ""}`;
+    // Construction de l'URL finale vers l'API ClinicalTrials
+    const targetUrl = `https://clinicaltrials.gov/api/v2/${urlPath}${
+      finalQuery ? "?" + finalQuery : ""
+    }`;
 
     console.log("Proxying to:", targetUrl);
 
