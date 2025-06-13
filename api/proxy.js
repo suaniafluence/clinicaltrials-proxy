@@ -4,25 +4,18 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Si le chemin est vide, on utilise "studies" par défaut
+    // Récupère le chemin dynamique, ou utilise "studies" par défaut
     const rawPath = req.url.split("/proxy/")[1]?.split("?")[0] || "";
-    const fallbackPath = rawPath === "" ? "studies" : rawPath;
+    const targetPath = rawPath === "" ? "studies" : rawPath;
 
-    // Nettoyage de la query string
+    // Extraction et nettoyage de la query string
     const queryString = req.url.split("?")[1] || "";
     const cleanQueryString = queryString
       .replace(/(^|&)url=[^&]*/g, "")
       .replace(/^&|&$/g, "");
 
-    // Ajout automatique de fmt=json si non présent
-    const hasFmt = /(?:^|&)fmt=/.test(cleanQueryString);
-    const finalQuery = cleanQueryString
-      ? cleanQueryString + (hasFmt ? "" : "&fmt=json")
-      : "fmt=json";
-
-    const targetUrl = `https://clinicaltrials.gov/api/v2/${fallbackPath}${
-      finalQuery ? "?" + finalQuery : ""
-    }`;
+    // ⚠️ Plus de fmt=json ici !
+    const targetUrl = `https://clinicaltrials.gov/api/v2/${targetPath}${cleanQueryString ? "?" + cleanQueryString : ""}`;
 
     console.log("🔁 Proxying to:", targetUrl);
 
@@ -30,7 +23,8 @@ export default async function handler(req, res) {
       method: req.method,
       headers: {
         "User-Agent": "ClinicalTrials-Proxy/1.0",
-      },
+        "Accept": "application/json"
+      }
     });
 
     if (!response.ok) {
@@ -43,15 +37,15 @@ export default async function handler(req, res) {
       success: true,
       data: data,
       proxiedFrom: targetUrl,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error("Proxy error:", error);
+    console.error("❌ Proxy error:", error.message);
     return res.status(500).json({
       success: false,
       error: "Proxy error",
       details: error.message,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     });
   }
 }
